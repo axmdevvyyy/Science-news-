@@ -45,7 +45,7 @@
     background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
     border-radius:var(--radius); padding:18px; box-shadow:0 10px 34px rgba(2,6,23,0.45);
     border:1px solid rgba(255,255,255,0.03); transition: transform .18s cubic-bezier(.2,.9,.3,1), box-shadow .2s;
-    overflow:hidden;
+    overflow:hidden; position:relative;
   }
   .card:hover{ transform: translateY(-8px); box-shadow:0 26px 60px rgba(2,6,23,0.6); }
   .meta{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
@@ -59,16 +59,24 @@
   a.article-link{display:inline-block;margin-top:8px;text-decoration:none;color:var(--accent);font-weight:700;border-radius:8px;padding:8px 12px;background:rgba(110,231,183,0.03);transition:transform .12s}
   a.article-link:hover{ transform: translateY(-3px); }
 
-  /* modal */
-  .modal-backdrop{ position:fixed; inset:0; background: linear-gradient(180deg, rgba(2,6,23,0.6), rgba(2,6,23,0.74)); display:flex; align-items:center; justify-content:center; z-index:2100; opacity:0; pointer-events:none; transition: opacity .16s ease; }
-  .modal-backdrop.show{ opacity:1; pointer-events:auto; }
-  .modal{ width:min(780px,94%); background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:14px; padding:20px; box-shadow:0 30px 80px rgba(3,8,20,0.8); transform: translateY(10px) scale(.995); opacity:0; transition: transform .18s cubic-bezier(.2,.9,.3,1), opacity .18s; }
-  .modal-backdrop.show .modal{ transform:none; opacity:1; }
+  /* delete button */
+  .del-btn{
+    appearance:none;border:0;background:rgba(255,255,255,0.03);color:#ffccd5;border-radius:10px;padding:6px;cursor:pointer;font-weight:700;
+    transition:transform .12s, background .12s; display:inline-flex;align-items:center;gap:6px;
+  }
+  .del-btn:hover{ transform:translateY(-3px); background:rgba(255,80,95,0.12) }
+
+  /* modal - note: backdrop transparency 0 so modal does not visually block page */
+  .modal-backdrop{ position:fixed; inset:0; background: transparent; display:flex; align-items:center; justify-content:center; z-index:2100; opacity:1; pointer-events:auto; transition: opacity .16s ease; }
+  .modal{ width:min(780px,94%); background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:14px; padding:20px; box-shadow:0 40px 120px rgba(3,8,20,0.9); transform: none; opacity:1; transition: transform .18s cubic-bezier(.2,.9,.3,1), opacity .18s; z-index:2110; }
+  /* keep layout consistent when "closed" by toggling .hidden on the backdrop element */
+  .hidden{ display:none !important; }
+
   .form-row{ display:flex; gap:12px; margin-bottom:12px; }
   .col{ flex:1; display:flex; flex-direction:column; gap:8px; }
   label{ font-size:13px; color:var(--muted); }
-  input[type="text"], textarea{ background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); padding:10px 12px; border-radius:10px; color: #eaf6ff; outline:none; transition: box-shadow .12s, border-color .12s; font-size:14px; }
-  input[type="text"]:focus, textarea:focus{ box-shadow: 0 6px 22px rgba(96,165,250,0.06); border-color: rgba(96,165,250,0.26); }
+  input[type="text"], input[type="password"], textarea{ background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); padding:10px 12px; border-radius:10px; color: #eaf6ff; outline:none; transition: box-shadow .12s, border-color .12s; font-size:14px; }
+  input[type="text"]:focus, textarea:focus, input[type="password"]:focus{ box-shadow: 0 6px 22px rgba(96,165,250,0.06); border-color: rgba(96,165,250,0.26); }
   textarea{ min-height:120px; resize:vertical; }
   .row-actions{ display:flex; gap:10px; justify-content:flex-end; align-items:center; margin-top:6px; }
   .btn{ padding:10px 14px; border-radius:10px; border:none; cursor:pointer; font-weight:700; }
@@ -76,11 +84,15 @@
   .btn.primary{ background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#052026; box-shadow: 0 10px 32px rgba(50,150,120,0.12); }
   .err{ color:#ffb4b4; font-size:13px; margin-top:6px }
 
+  /* password form small UI */
+  .pwd-form{ width:360px; max-width:92%; display:flex; flex-direction:column; gap:10px; align-items:stretch; padding:18px; border-radius:12px; box-shadow:0 20px 60px rgba(2,6,23,0.6); }
+  .pwd-header{ font-weight:800; font-size:16px; margin-bottom:2px; color:#fff }
+  .pwd-note{ font-size:13px; color:var(--muted) }
+
   /* small helpers */
   .small{ font-size:13px; color:var(--muted) }
   .note{ margin-top:8px; font-size:13px; color:var(--muted); }
 
-  @keyframes pop { from { transform: scale(.98); opacity:0 } to { transform:none; opacity:1 } }
   @media (max-width:700px){ .form-row{ flex-direction:column } .avatar{ width:40px; height:40px } }
 </style>
 </head>
@@ -107,8 +119,8 @@
     </section>
   </main>
 
-  <!-- Modal -->
-  <div class="modal-backdrop" id="backdrop" aria-hidden="true">
+  <!-- Add Post Modal (backdrop transparency intentionally 0 so it doesn't visually block) -->
+  <div class="modal-backdrop hidden" id="backdrop" aria-hidden="true">
     <form class="modal" id="postForm" autocomplete="off" novalidate>
       <h3 style="margin:0 0 12px 0">Add Post</h3>
 
@@ -150,20 +162,38 @@
     </form>
   </div>
 
+  <!-- Password modal for deleting posts (also transparent backdrop) -->
+  <div class="modal-backdrop hidden" id="pwdBackdrop" aria-hidden="true">
+    <div class="pwd-form modal" role="dialog" aria-modal="true" aria-labelledby="pwdTitle">
+      <div>
+        <div class="pwd-header" id="pwdTitle">Administrator — Confirm Delete</div>
+        <div class="pwd-note">Enter administrator password to delete the selected post.</div>
+      </div>
+
+      <input id="pwdInput" type="password" placeholder="Administrator password" autocomplete="off" />
+      <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center;">
+        <div id="pwdErr" class="err" style="display:none;margin-right:auto">Incorrect password</div>
+        <button id="pwdCancel" class="btn ghost" type="button">Cancel</button>
+        <button id="pwdSubmit" class="btn primary" type="button">Confirm Delete</button>
+      </div>
+    </div>
+  </div>
+
 <script>
 /*
   hillcrest-science-news.html
   - Single-file site.
-  - By default runs in "local mode" (saves posts in browser localStorage).
-  - OPTIONAL: To enable global posts visible to everyone, set API_BASE to your serverless endpoint (example on Vercel),
-    then deploy a tiny endpoint that supports:
-      GET  {API_BASE}/api/posts    -> returns JSON array of posts (newest first)
-      POST {API_BASE}/api/posts    -> accepts JSON { title, summary, why, link, by } and returns saved post with id + createdAt
-    CORS must allow this page. If API_BASE is empty string, the site uses localStorage only.
+  - Local-first storage (localStorage). If you set API_BASE to a server endpoint that implements GET/POST/DELETE,
+    the site will attempt server sync. If the server is unreachable it gracefully falls back to local storage.
+  - Delete posts: clicking a post's trash button requires the admin password:
+      HillcrestAdministrator2272
+    If entered correctly in the password modal, the post will be deleted locally and an attempt will be made
+    to delete on the server (DELETE {API_BASE}/api/posts/:id) if API_BASE is set.
+  - The modal backdrops are transparent (background: transparent) per your request so they don't visually block the page.
 */
 
-const API_BASE = "https://hillcrestsciencenews.vercel.app/"; // <-- If you have a server (Vercel, Netlify Functions, etc.) set it here, e.g. "https://your-app.vercel.app"
-// If API_BASE is empty, local-only mode is used.
+const API_BASE = "https://hillcrestsciencenews.vercel.app/"; // keep or set to "" for local-only
+const ADMIN_PASSWORD = "HillcrestAdministrator2272";
 
 const LOCAL_KEY = "hsn_posts_v1";
 const POLL_INTERVAL = 5000; // ms when using API (simple polling)
@@ -178,7 +208,14 @@ const cancelBtn = el('#cancelBtn');
 const syncStatus = el('#syncStatus');
 const linkErr = el('#linkErr');
 
+const pwdBackdrop = el('#pwdBackdrop');
+const pwdInput = el('#pwdInput');
+const pwdSubmit = el('#pwdSubmit');
+const pwdCancel = el('#pwdCancel');
+const pwdErr = el('#pwdErr');
+
 let posts = []; // array of post objects
+let pendingDeleteId = null; // id awaiting admin confirmation
 
 function uid() { return 'p_' + Math.random().toString(36).slice(2,10); }
 function nowISO(){ return new Date().toISOString(); }
@@ -194,7 +231,6 @@ function timeAgo(iso){
 function isSnExplores(url){
   try{
     const u = new URL(url);
-    // accept subdomains like www.snexplores.org
     return u.hostname.endsWith('snexplores.org');
   }catch(e){ return false; }
 }
@@ -215,7 +251,10 @@ function render(){
             <div style="margin-top:6px"><h2 class="post-title">${escapeHtml(p.title)}</h2></div>
           </div>
         </div>
-        <div class="time">${new Date(p.createdAt).toLocaleDateString()}</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div class="time">${new Date(p.createdAt).toLocaleDateString()}</div>
+          <button class="del-btn" data-id="${encodeURIComponent(p.id)}" title="Delete post (admin only)">🗑 Delete</button>
+        </div>
       </div>
       <div>
         <p class="lead">${escapeHtml(p.summary)}</p>
@@ -251,7 +290,6 @@ async function fetchFromApi(){
     const r = await fetch(API_BASE.replace(/\/$/,'') + '/api/posts', { cache:'no-store' });
     if (!r.ok) throw new Error('Bad response');
     const data = await r.json();
-    // expect array of posts with createdAt and id
     return Array.isArray(data) ? data : [];
   }catch(e){
     console.warn('API fetch failed', e);
@@ -272,6 +310,18 @@ async function postToApi(post){
     return null;
   }
 }
+async function deleteOnApi(id){
+  try{
+    const r = await fetch(API_BASE.replace(/\/$/,'') + '/api/posts/' + encodeURIComponent(id), {
+      method: 'DELETE'
+    });
+    if (!r.ok) throw new Error('API delete failed');
+    return true;
+  }catch(e){
+    console.warn('API delete failed', e);
+    return false;
+  }
+}
 
 /* Init & sync logic */
 let pollTimer = null;
@@ -287,14 +337,12 @@ async function init(){
       pollTimer = setInterval(async ()=>{
         const remote = await fetchFromApi();
         if (Array.isArray(remote)){
-          // naive replace — server is source of truth
           posts = remote.slice().sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
           render();
         }
       }, POLL_INTERVAL);
     }else{
       syncStatus.textContent = 'Sync: server unreachable — falling back to local mode';
-      // fall back to local
       posts = loadLocal().sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
       render();
     }
@@ -307,15 +355,55 @@ async function init(){
 
 /* Modal controls */
 function openModal(){
-  backdrop.classList.add('show');
+  backdrop.classList.remove('hidden');
   backdrop.setAttribute('aria-hidden','false');
   form.reset();
   linkErr.style.display = 'none';
   setTimeout(()=> el('#title').focus(), 120);
 }
 function closeModal(){
-  backdrop.classList.remove('show');
+  backdrop.classList.add('hidden');
   backdrop.setAttribute('aria-hidden','true');
+}
+
+/* Password modal controls */
+function openPwdModal(targetId){
+  pendingDeleteId = targetId;
+  pwdErr.style.display = 'none';
+  pwdInput.value = '';
+  pwdBackdrop.classList.remove('hidden');
+  pwdBackdrop.setAttribute('aria-hidden','false');
+  setTimeout(()=> pwdInput.focus(), 60);
+}
+function closePwdModal(){
+  pendingDeleteId = null;
+  pwdBackdrop.classList.add('hidden');
+  pwdBackdrop.setAttribute('aria-hidden','true');
+  pwdInput.value = '';
+  pwdErr.style.display = 'none';
+}
+
+/* Deletion flow */
+async function doDelete(id){
+  // remove locally and persist
+  posts = posts.filter(p => p.id !== id);
+  render();
+
+  // update local storage as fallback
+  const local = loadLocal().filter(p => p.id !== id);
+  saveLocal(local);
+
+  // attempt server deletion if API is set
+  if (API_BASE && API_BASE.trim()){
+    const ok = await deleteOnApi(id);
+    if (ok){
+      syncStatus.textContent = 'Sync: post deleted on server';
+    } else {
+      syncStatus.textContent = 'Sync: failed to delete on server — removed locally';
+    }
+  } else {
+    syncStatus.textContent = 'Local mode • post deleted locally';
+  }
 }
 
 /* Form submit */
@@ -361,14 +449,12 @@ form.addEventListener('submit', async (ev)=>{
       render();
       syncStatus.textContent = 'Sync: post saved to server';
     } else {
-      // fallback: save locally and inform user
       const local = loadLocal();
       local.unshift(post);
       saveLocal(local);
       syncStatus.textContent = 'Sync: failed to save to server — post saved locally';
     }
   } else {
-    // local-only
     const local = loadLocal();
     local.unshift(post);
     saveLocal(local);
@@ -380,7 +466,39 @@ form.addEventListener('submit', async (ev)=>{
 openAdd.addEventListener('click', openModal);
 cancelBtn.addEventListener('click', (e)=>{ e.preventDefault(); closeModal(); });
 backdrop.addEventListener('click', (e)=>{ if (e.target === backdrop) closeModal(); });
-window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeModal(); });
+window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') { if (!backdrop.classList.contains('hidden')) closeModal(); if (!pwdBackdrop.classList.contains('hidden')) closePwdModal(); } });
+
+/* Delete button delegation */
+postsEl.addEventListener('click', (e)=>{
+  const btn = e.target.closest('.del-btn');
+  if (!btn) return;
+  const id = decodeURIComponent(btn.getAttribute('data-id') || '');
+  if (!id) return;
+  // open password modal
+  openPwdModal(id);
+});
+
+/* Password modal actions */
+pwdCancel.addEventListener('click', ()=> closePwdModal());
+pwdSubmit.addEventListener('click', async ()=>{
+  pwdErr.style.display = 'none';
+  const val = pwdInput.value || '';
+  if (val === ADMIN_PASSWORD){
+    // proceed to delete
+    const id = pendingDeleteId;
+    closePwdModal();
+    await doDelete(id);
+  } else {
+    pwdErr.textContent = 'Incorrect password';
+    pwdErr.style.display = 'block';
+    pwdInput.focus();
+  }
+});
+
+/* allow enter key in password input to submit */
+pwdInput.addEventListener('keydown', (e)=>{
+  if (e.key === 'Enter') { e.preventDefault(); pwdSubmit.click(); }
+});
 
 /* Storage sync across tabs (when using localStorage) */
 window.addEventListener('storage', (e)=>{
